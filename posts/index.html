@@ -156,6 +156,21 @@
 
 <article class="post-entry"> 
   <header class="entry-header">
+    <h2 class="entry-hint-parent">Ray_learn
+    </h2>
+  </header>
+  <div class="entry-content">
+    <p>为什么需要 Ray 在 AI 和大数据任务日益增长的今天，快速构建高性能、易维护、可扩展的分布式系统成为每个工程团队的核心需求。但传统方案往往存在以下痛点：
+需要两套代码（本地开发 &#43; 上线集群） 依赖消息队列或手动调度 状态管理复杂，需要自己加锁或用数据库 资源调度不灵活，难以混部 CPU/GPU 任务 部署运维复杂，需手动打包、上传、配置 Ray 的出现，正是为了解决这些问题 。它的核心魔法在于：让分布式编程像写 python 本地程序一样简单。只需要一行装饰器@ray.remote，就能让函数从“单机运行”变成“集群并行”。 一句话定义 Ray Ray 是一个通用的分布式计算框架，支持任务并行、Actor 模型、资源调度、共享内存及容错等核心能力，让开发者便捷的构建复杂的分布式应用。 Ray 的核心能力 任务并行 ：自动将函数调用分布到多个节点上执行，以高效利用资源。 Actor 模型 ：支持构建有状态服务，如缓存和模型服务，简化状态管理。 资源调度 ：灵活指定 CPU、GPU、内存等资源需求，实现精细化控制。 容错机制 ：自动重试失败的任务，维护系统稳定性。 Python-first API ：友好的 Python 接口，同时支持 Java 和 C&#43;&#43;。 高性能数据传输：支持共享内存和跨节点数据传输，提升数据处理效率。 云原生集成 ：兼容 Kubernetes、Docker、云存储。 Ray 的设计理念： 让开发者专注逻辑和资源需求，而将调度、容错、传输、内存管理等决定性因素交由 Ray 自动处理。 Ray 的定位 对比对象 Ray 的优势 Celery
+Ray 作为分布式计算引擎，不依赖消息队列，内置调度机制，灵活构建复杂的服务； Celery 是任务队列，需要依赖消息队列（如 Redis、RabbitMQ） Spark Ray 延迟更低、支持有状态、适合 AI 场景、实时计算； Spark 是大数据批处理引擎，更适合批处理、ETL等离线大作业 Kubernetes Job Ray 是应用内的调度器，支持细粒度资源控制（如 0.5 个 CPU）、Actor 服务、多任务协同； K8s 是基础设施调度，无法精细控制任务级资源，无法支持 Actor，适合短期的批处理任务 因此，Ray 不是 Spark、Kubernetes Job 的替代品，而是填补它们之间的空白 。 它更像是一个应用级的调度引擎 ，能解决 AI 工作流中遇到的“最后一公里”问题 —— 比如 ETL 后的数据如何高效调度到训练节点，如何在 GPU 上并行处理多模态数据，如何构建低延迟、高并发的推理服务等。 Ray 的工作流程简述 定义一个函数或类，加上 @ray.remote 装饰器。 调用 .remote() 方法提交任务到集群。 GCS（全局控制服务）调度任务到合适的节点。 Raylet（本地调度器）在节点上调度任务或 Actor。 执行完后，结果存储在 Object Store 中，返回 ObjectRef。 其他任务或 Actor 可以通过 ray.get() 或 ray.wait() 获取结果。 Ray 的核心架构：一个头节点负责调度，多个工作节点负责执行 Task 和 Actor。 GCS：负责全局调度、元数据管理、Actor 生命周期管理 Raylet ：节点本地调度器，负责任务分发、资源管理 Object Store ：分布式共享内存，用于 Task/Actor 之间高效数据传输 [图片] Ray 的核心优势 Ray 的诞生背景：为了解决 AI 和大规模数据处理场景下，传统框架（如 Spark、Celery）在任务调度、状态维护、资源利用等方面存在多个痛点。 Ray 的设计初衷：为新兴 AI 应用（如深度学习、强化学习和超参数调优）提供一个高性能、易用且灵活的底层框架，从而提升开发和计算效率。
+...</p>
+  </div>
+  <footer class="entry-footer"><span title='2026-02-26 17:41:44 +0800 CST'>February 26, 2026</span></footer>
+  <a class="entry-link" aria-label="post link to Ray_learn" href="https://Jade07-1.github.io/posts/ray_learn/"></a>
+</article>
+
+<article class="post-entry"> 
+  <header class="entry-header">
     <h2 class="entry-hint-parent">My First Blog
     </h2>
   </header>

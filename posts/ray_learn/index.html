@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="auto" data-theme="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>Ray_learn | Jia Wang</title>
+<meta name="keywords" content="">
+<meta name="description" content="为什么需要 Ray
+在 AI 和大数据任务日益增长的今天，快速构建高性能、易维护、可扩展的分布式系统成为每个工程团队的核心需求。但传统方案往往存在以下痛点：
+
+需要两套代码（本地开发 &#43; 上线集群）
+依赖消息队列或手动调度
+状态管理复杂，需要自己加锁或用数据库
+资源调度不灵活，难以混部 CPU/GPU 任务
+部署运维复杂，需手动打包、上传、配置
+Ray 的出现，正是为了解决这些问题 。它的核心魔法在于：让分布式编程像写 python 本地程序一样简单。只需要一行装饰器@ray.remote，就能让函数从“单机运行”变成“集群并行”。
+
+一句话定义 Ray
+Ray 是一个通用的分布式计算框架，支持任务并行、Actor 模型、资源调度、共享内存及容错等核心能力，让开发者便捷的构建复杂的分布式应用。
+
+Ray 的核心能力
+
+任务并行 ：自动将函数调用分布到多个节点上执行，以高效利用资源。
+Actor 模型 ：支持构建有状态服务，如缓存和模型服务，简化状态管理。
+资源调度 ：灵活指定 CPU、GPU、内存等资源需求，实现精细化控制。
+容错机制 ：自动重试失败的任务，维护系统稳定性。
+Python-first API ：友好的 Python 接口，同时支持 Java 和 C&#43;&#43;。
+高性能数据传输：支持共享内存和跨节点数据传输，提升数据处理效率。
+云原生集成 ：兼容 Kubernetes、Docker、云存储。
+Ray 的设计理念：
+让开发者专注逻辑和资源需求，而将调度、容错、传输、内存管理等决定性因素交由 Ray 自动处理。
+
+Ray 的定位
+对比对象
+Ray 的优势
+Celery
+
+Ray 作为分布式计算引擎，不依赖消息队列，内置调度机制，灵活构建复杂的服务；
+Celery 是任务队列，需要依赖消息队列（如 Redis、RabbitMQ）
+Spark
+Ray 延迟更低、支持有状态、适合 AI 场景、实时计算；
+Spark 是大数据批处理引擎，更适合批处理、ETL等离线大作业
+Kubernetes Job
+Ray 是应用内的调度器，支持细粒度资源控制（如 0.5 个 CPU）、Actor 服务、多任务协同；
+K8s 是基础设施调度，无法精细控制任务级资源，无法支持 Actor，适合短期的批处理任务
+因此，Ray 不是 Spark、Kubernetes Job 的替代品，而是填补它们之间的空白 。
+它更像是一个应用级的调度引擎 ，能解决 AI 工作流中遇到的“最后一公里”问题 —— 比如 ETL 后的数据如何高效调度到训练节点，如何在 GPU 上并行处理多模态数据，如何构建低延迟、高并发的推理服务等。
+
+Ray 的工作流程简述
+
+定义一个函数或类，加上 @ray.remote 装饰器。
+调用 .remote() 方法提交任务到集群。
+GCS（全局控制服务）调度任务到合适的节点。
+Raylet（本地调度器）在节点上调度任务或 Actor。
+执行完后，结果存储在 Object Store 中，返回 ObjectRef。
+其他任务或 Actor 可以通过 ray.get() 或 ray.wait() 获取结果。
+Ray 的核心架构：一个头节点负责调度，多个工作节点负责执行 Task 和 Actor。
+
+
+GCS：负责全局调度、元数据管理、Actor 生命周期管理
+Raylet ：节点本地调度器，负责任务分发、资源管理
+Object Store ：分布式共享内存，用于 Task/Actor 之间高效数据传输
+[图片]
+
+Ray 的核心优势
+Ray 的诞生背景：为了解决 AI 和大规模数据处理场景下，传统框架（如 Spark、Celery）在任务调度、状态维护、资源利用等方面存在多个痛点。
+Ray 的设计初衷：为新兴 AI 应用（如深度学习、强化学习和超参数调优）提供一个高性能、易用且灵活的底层框架，从而提升开发和计算效率。">
+<meta name="author" content="">
+<link rel="canonical" href="https://Jade07-1.github.io/posts/ray_learn/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.da3211e5ef867bf2b75fd5a6515cfed7195c011e8ab735694e203810a827097b.css" integrity="sha256-2jIR5e&#43;Ge/K3X9WmUVz&#43;1xlcAR6KtzVpTiA4EKgnCXs=" rel="preload stylesheet" as="style">
+<link rel="icon" href="https://Jade07-1.github.io/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="https://Jade07-1.github.io/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="https://Jade07-1.github.io/favicon-32x32.png">
+<link rel="apple-touch-icon" href="https://Jade07-1.github.io/apple-touch-icon.png">
+<link rel="mask-icon" href="https://Jade07-1.github.io/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="zh-cn" href="https://Jade07-1.github.io/posts/ray_learn/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+                color-scheme: dark;
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .toc {
+                background: var(--entry);
+            }
+        }
+
+        @media (prefers-color-scheme: light) {
+            .list::-webkit-scrollbar-thumb {
+                border-color: var(--code-bg);
+            }
+        }
+
+    </style>
+</noscript>
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.querySelector("html").dataset.theme = 'dark';
+    } else if (localStorage.getItem("pref-theme") === "light") {
+       document.querySelector("html").dataset.theme = 'light';
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.querySelector("html").dataset.theme = 'dark';
+    } else {
+        document.querySelector("html").dataset.theme = 'light';
+    }
+
+</script><meta property="og:url" content="https://Jade07-1.github.io/posts/ray_learn/">
+  <meta property="og:site_name" content="Jia Wang">
+  <meta property="og:title" content="Ray_learn">
+  <meta property="og:description" content="为什么需要 Ray 在 AI 和大数据任务日益增长的今天，快速构建高性能、易维护、可扩展的分布式系统成为每个工程团队的核心需求。但传统方案往往存在以下痛点：
+需要两套代码（本地开发 &#43; 上线集群） 依赖消息队列或手动调度 状态管理复杂，需要自己加锁或用数据库 资源调度不灵活，难以混部 CPU/GPU 任务 部署运维复杂，需手动打包、上传、配置 Ray 的出现，正是为了解决这些问题 。它的核心魔法在于：让分布式编程像写 python 本地程序一样简单。只需要一行装饰器@ray.remote，就能让函数从“单机运行”变成“集群并行”。 一句话定义 Ray Ray 是一个通用的分布式计算框架，支持任务并行、Actor 模型、资源调度、共享内存及容错等核心能力，让开发者便捷的构建复杂的分布式应用。 Ray 的核心能力 任务并行 ：自动将函数调用分布到多个节点上执行，以高效利用资源。 Actor 模型 ：支持构建有状态服务，如缓存和模型服务，简化状态管理。 资源调度 ：灵活指定 CPU、GPU、内存等资源需求，实现精细化控制。 容错机制 ：自动重试失败的任务，维护系统稳定性。 Python-first API ：友好的 Python 接口，同时支持 Java 和 C&#43;&#43;。 高性能数据传输：支持共享内存和跨节点数据传输，提升数据处理效率。 云原生集成 ：兼容 Kubernetes、Docker、云存储。 Ray 的设计理念： 让开发者专注逻辑和资源需求，而将调度、容错、传输、内存管理等决定性因素交由 Ray 自动处理。 Ray 的定位 对比对象 Ray 的优势 Celery
+Ray 作为分布式计算引擎，不依赖消息队列，内置调度机制，灵活构建复杂的服务； Celery 是任务队列，需要依赖消息队列（如 Redis、RabbitMQ） Spark Ray 延迟更低、支持有状态、适合 AI 场景、实时计算； Spark 是大数据批处理引擎，更适合批处理、ETL等离线大作业 Kubernetes Job Ray 是应用内的调度器，支持细粒度资源控制（如 0.5 个 CPU）、Actor 服务、多任务协同； K8s 是基础设施调度，无法精细控制任务级资源，无法支持 Actor，适合短期的批处理任务 因此，Ray 不是 Spark、Kubernetes Job 的替代品，而是填补它们之间的空白 。 它更像是一个应用级的调度引擎 ，能解决 AI 工作流中遇到的“最后一公里”问题 —— 比如 ETL 后的数据如何高效调度到训练节点，如何在 GPU 上并行处理多模态数据，如何构建低延迟、高并发的推理服务等。 Ray 的工作流程简述 定义一个函数或类，加上 @ray.remote 装饰器。 调用 .remote() 方法提交任务到集群。 GCS（全局控制服务）调度任务到合适的节点。 Raylet（本地调度器）在节点上调度任务或 Actor。 执行完后，结果存储在 Object Store 中，返回 ObjectRef。 其他任务或 Actor 可以通过 ray.get() 或 ray.wait() 获取结果。 Ray 的核心架构：一个头节点负责调度，多个工作节点负责执行 Task 和 Actor。 GCS：负责全局调度、元数据管理、Actor 生命周期管理 Raylet ：节点本地调度器，负责任务分发、资源管理 Object Store ：分布式共享内存，用于 Task/Actor 之间高效数据传输 [图片] Ray 的核心优势 Ray 的诞生背景：为了解决 AI 和大规模数据处理场景下，传统框架（如 Spark、Celery）在任务调度、状态维护、资源利用等方面存在多个痛点。 Ray 的设计初衷：为新兴 AI 应用（如深度学习、强化学习和超参数调优）提供一个高性能、易用且灵活的底层框架，从而提升开发和计算效率。">
+  <meta property="og:locale" content="zh-CN">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="posts">
+    <meta property="article:published_time" content="2026-02-26T17:41:44+08:00">
+    <meta property="article:modified_time" content="2026-02-26T17:41:44+08:00">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Ray_learn">
+<meta name="twitter:description" content="为什么需要 Ray
+在 AI 和大数据任务日益增长的今天，快速构建高性能、易维护、可扩展的分布式系统成为每个工程团队的核心需求。但传统方案往往存在以下痛点：
+
+需要两套代码（本地开发 &#43; 上线集群）
+依赖消息队列或手动调度
+状态管理复杂，需要自己加锁或用数据库
+资源调度不灵活，难以混部 CPU/GPU 任务
+部署运维复杂，需手动打包、上传、配置
+Ray 的出现，正是为了解决这些问题 。它的核心魔法在于：让分布式编程像写 python 本地程序一样简单。只需要一行装饰器@ray.remote，就能让函数从“单机运行”变成“集群并行”。
+
+一句话定义 Ray
+Ray 是一个通用的分布式计算框架，支持任务并行、Actor 模型、资源调度、共享内存及容错等核心能力，让开发者便捷的构建复杂的分布式应用。
+
+Ray 的核心能力
+
+任务并行 ：自动将函数调用分布到多个节点上执行，以高效利用资源。
+Actor 模型 ：支持构建有状态服务，如缓存和模型服务，简化状态管理。
+资源调度 ：灵活指定 CPU、GPU、内存等资源需求，实现精细化控制。
+容错机制 ：自动重试失败的任务，维护系统稳定性。
+Python-first API ：友好的 Python 接口，同时支持 Java 和 C&#43;&#43;。
+高性能数据传输：支持共享内存和跨节点数据传输，提升数据处理效率。
+云原生集成 ：兼容 Kubernetes、Docker、云存储。
+Ray 的设计理念：
+让开发者专注逻辑和资源需求，而将调度、容错、传输、内存管理等决定性因素交由 Ray 自动处理。
+
+Ray 的定位
+对比对象
+Ray 的优势
+Celery
+
+Ray 作为分布式计算引擎，不依赖消息队列，内置调度机制，灵活构建复杂的服务；
+Celery 是任务队列，需要依赖消息队列（如 Redis、RabbitMQ）
+Spark
+Ray 延迟更低、支持有状态、适合 AI 场景、实时计算；
+Spark 是大数据批处理引擎，更适合批处理、ETL等离线大作业
+Kubernetes Job
+Ray 是应用内的调度器，支持细粒度资源控制（如 0.5 个 CPU）、Actor 服务、多任务协同；
+K8s 是基础设施调度，无法精细控制任务级资源，无法支持 Actor，适合短期的批处理任务
+因此，Ray 不是 Spark、Kubernetes Job 的替代品，而是填补它们之间的空白 。
+它更像是一个应用级的调度引擎 ，能解决 AI 工作流中遇到的“最后一公里”问题 —— 比如 ETL 后的数据如何高效调度到训练节点，如何在 GPU 上并行处理多模态数据，如何构建低延迟、高并发的推理服务等。
+
+Ray 的工作流程简述
+
+定义一个函数或类，加上 @ray.remote 装饰器。
+调用 .remote() 方法提交任务到集群。
+GCS（全局控制服务）调度任务到合适的节点。
+Raylet（本地调度器）在节点上调度任务或 Actor。
+执行完后，结果存储在 Object Store 中，返回 ObjectRef。
+其他任务或 Actor 可以通过 ray.get() 或 ray.wait() 获取结果。
+Ray 的核心架构：一个头节点负责调度，多个工作节点负责执行 Task 和 Actor。
+
+
+GCS：负责全局调度、元数据管理、Actor 生命周期管理
+Raylet ：节点本地调度器，负责任务分发、资源管理
+Object Store ：分布式共享内存，用于 Task/Actor 之间高效数据传输
+[图片]
+
+Ray 的核心优势
+Ray 的诞生背景：为了解决 AI 和大规模数据处理场景下，传统框架（如 Spark、Celery）在任务调度、状态维护、资源利用等方面存在多个痛点。
+Ray 的设计初衷：为新兴 AI 应用（如深度学习、强化学习和超参数调优）提供一个高性能、易用且灵活的底层框架，从而提升开发和计算效率。">
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "https://Jade07-1.github.io/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "Ray_learn",
+      "item": "https://Jade07-1.github.io/posts/ray_learn/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Ray_learn",
+  "name": "Ray_learn",
+  "description": "为什么需要 Ray 在 AI 和大数据任务日益增长的今天，快速构建高性能、易维护、可扩展的分布式系统成为每个工程团队的核心需求。但传统方案往往存在以下痛点：\n需要两套代码（本地开发 + 上线集群） 依赖消息队列或手动调度 状态管理复杂，需要自己加锁或用数据库 资源调度不灵活，难以混部 CPU/GPU 任务 部署运维复杂，需手动打包、上传、配置 Ray 的出现，正是为了解决这些问题 。它的核心魔法在于：让分布式编程像写 python 本地程序一样简单。只需要一行装饰器@ray.remote，就能让函数从“单机运行”变成“集群并行”。 一句话定义 Ray Ray 是一个通用的分布式计算框架，支持任务并行、Actor 模型、资源调度、共享内存及容错等核心能力，让开发者便捷的构建复杂的分布式应用。 Ray 的核心能力 任务并行 ：自动将函数调用分布到多个节点上执行，以高效利用资源。 Actor 模型 ：支持构建有状态服务，如缓存和模型服务，简化状态管理。 资源调度 ：灵活指定 CPU、GPU、内存等资源需求，实现精细化控制。 容错机制 ：自动重试失败的任务，维护系统稳定性。 Python-first API ：友好的 Python 接口，同时支持 Java 和 C++。 高性能数据传输：支持共享内存和跨节点数据传输，提升数据处理效率。 云原生集成 ：兼容 Kubernetes、Docker、云存储。 Ray 的设计理念： 让开发者专注逻辑和资源需求，而将调度、容错、传输、内存管理等决定性因素交由 Ray 自动处理。 Ray 的定位 对比对象 Ray 的优势 Celery\nRay 作为分布式计算引擎，不依赖消息队列，内置调度机制，灵活构建复杂的服务； Celery 是任务队列，需要依赖消息队列（如 Redis、RabbitMQ） Spark Ray 延迟更低、支持有状态、适合 AI 场景、实时计算； Spark 是大数据批处理引擎，更适合批处理、ETL等离线大作业 Kubernetes Job Ray 是应用内的调度器，支持细粒度资源控制（如 0.5 个 CPU）、Actor 服务、多任务协同； K8s 是基础设施调度，无法精细控制任务级资源，无法支持 Actor，适合短期的批处理任务 因此，Ray 不是 Spark、Kubernetes Job 的替代品，而是填补它们之间的空白 。 它更像是一个应用级的调度引擎 ，能解决 AI 工作流中遇到的“最后一公里”问题 —— 比如 ETL 后的数据如何高效调度到训练节点，如何在 GPU 上并行处理多模态数据，如何构建低延迟、高并发的推理服务等。 Ray 的工作流程简述 定义一个函数或类，加上 @ray.remote 装饰器。 调用 .remote() 方法提交任务到集群。 GCS（全局控制服务）调度任务到合适的节点。 Raylet（本地调度器）在节点上调度任务或 Actor。 执行完后，结果存储在 Object Store 中，返回 ObjectRef。 其他任务或 Actor 可以通过 ray.get() 或 ray.wait() 获取结果。 Ray 的核心架构：一个头节点负责调度，多个工作节点负责执行 Task 和 Actor。 GCS：负责全局调度、元数据管理、Actor 生命周期管理 Raylet ：节点本地调度器，负责任务分发、资源管理 Object Store ：分布式共享内存，用于 Task/Actor 之间高效数据传输 [图片] Ray 的核心优势 Ray 的诞生背景：为了解决 AI 和大规模数据处理场景下，传统框架（如 Spark、Celery）在任务调度、状态维护、资源利用等方面存在多个痛点。 Ray 的设计初衷：为新兴 AI 应用（如深度学习、强化学习和超参数调优）提供一个高性能、易用且灵活的底层框架，从而提升开发和计算效率。\n",
+  "keywords": [
+    
+  ],
+  "articleBody": "为什么需要 Ray 在 AI 和大数据任务日益增长的今天，快速构建高性能、易维护、可扩展的分布式系统成为每个工程团队的核心需求。但传统方案往往存在以下痛点：\n需要两套代码（本地开发 + 上线集群） 依赖消息队列或手动调度 状态管理复杂，需要自己加锁或用数据库 资源调度不灵活，难以混部 CPU/GPU 任务 部署运维复杂，需手动打包、上传、配置 Ray 的出现，正是为了解决这些问题 。它的核心魔法在于：让分布式编程像写 python 本地程序一样简单。只需要一行装饰器@ray.remote，就能让函数从“单机运行”变成“集群并行”。 一句话定义 Ray Ray 是一个通用的分布式计算框架，支持任务并行、Actor 模型、资源调度、共享内存及容错等核心能力，让开发者便捷的构建复杂的分布式应用。 Ray 的核心能力 任务并行 ：自动将函数调用分布到多个节点上执行，以高效利用资源。 Actor 模型 ：支持构建有状态服务，如缓存和模型服务，简化状态管理。 资源调度 ：灵活指定 CPU、GPU、内存等资源需求，实现精细化控制。 容错机制 ：自动重试失败的任务，维护系统稳定性。 Python-first API ：友好的 Python 接口，同时支持 Java 和 C++。 高性能数据传输：支持共享内存和跨节点数据传输，提升数据处理效率。 云原生集成 ：兼容 Kubernetes、Docker、云存储。 Ray 的设计理念： 让开发者专注逻辑和资源需求，而将调度、容错、传输、内存管理等决定性因素交由 Ray 自动处理。 Ray 的定位 对比对象 Ray 的优势 Celery\nRay 作为分布式计算引擎，不依赖消息队列，内置调度机制，灵活构建复杂的服务； Celery 是任务队列，需要依赖消息队列（如 Redis、RabbitMQ） Spark Ray 延迟更低、支持有状态、适合 AI 场景、实时计算； Spark 是大数据批处理引擎，更适合批处理、ETL等离线大作业 Kubernetes Job Ray 是应用内的调度器，支持细粒度资源控制（如 0.5 个 CPU）、Actor 服务、多任务协同； K8s 是基础设施调度，无法精细控制任务级资源，无法支持 Actor，适合短期的批处理任务 因此，Ray 不是 Spark、Kubernetes Job 的替代品，而是填补它们之间的空白 。 它更像是一个应用级的调度引擎 ，能解决 AI 工作流中遇到的“最后一公里”问题 —— 比如 ETL 后的数据如何高效调度到训练节点，如何在 GPU 上并行处理多模态数据，如何构建低延迟、高并发的推理服务等。 Ray 的工作流程简述 定义一个函数或类，加上 @ray.remote 装饰器。 调用 .remote() 方法提交任务到集群。 GCS（全局控制服务）调度任务到合适的节点。 Raylet（本地调度器）在节点上调度任务或 Actor。 执行完后，结果存储在 Object Store 中，返回 ObjectRef。 其他任务或 Actor 可以通过 ray.get() 或 ray.wait() 获取结果。 Ray 的核心架构：一个头节点负责调度，多个工作节点负责执行 Task 和 Actor。 GCS：负责全局调度、元数据管理、Actor 生命周期管理 Raylet ：节点本地调度器，负责任务分发、资源管理 Object Store ：分布式共享内存，用于 Task/Actor 之间高效数据传输 [图片] Ray 的核心优势 Ray 的诞生背景：为了解决 AI 和大规模数据处理场景下，传统框架（如 Spark、Celery）在任务调度、状态维护、资源利用等方面存在多个痛点。 Ray 的设计初衷：为新兴 AI 应用（如深度学习、强化学习和超参数调优）提供一个高性能、易用且灵活的底层框架，从而提升开发和计算效率。\n异构资源调度：灵活支持 CPU/GPU 混部 问题：复杂 AI Pipeline 不同阶段资源需求差异大（如预处理用 CPU、训练用 GPU），传统框架调度不灵活。 Ray ：允许用户在 Task 和 Actor 上直接指定资源需求（如 @ray.remote(num_gpus=1)）。调度器能精确分配任务到相应资源的节点上，实现高效混部。 细粒度任务调度：微秒级响应，支持高频计算 问题：如 Spark 等框架调度延迟高，难以应对强化学习、超参搜索等场景中数百万微小任务的调度需求。 Ray：支持微秒级的任务调度，每秒可调度数百万个任务，资源利用率高，适合细粒度、高并发的 AI 场景。 原生支持有状态计算：Actor 模型 问题：Spark 等框架侧重无状态任务，状态维护需依赖外部系统（如 Redis），开发复杂、性能受限。 Ray：引入了 Actor 模型，允许开发者像编写普通 Python 类一样创建有状态服务。Ray 负责管理 Actor 的生命期，使得实现参数服务器和模拟环境变得简单高效。 统一编程模型：覆盖 AI 全流程，一套代码跑 everywhere 问题：构建完整 AI 系统通常需要多个工具，增加了架构复杂性及维护成本。且需编写两套代码，一套用于本地，另一套用于服务器，重复开发增加调试压力。 Ray：提供统一编程模型，通过 Task 和 Actor 实现数据处理、模型训练和部署，简化架构： 数据处理：通过 Ray Core 和 Ray Data 处理多模态数据和分布式 ETL。 训练与调参：Ray Train 和 Ray Tune 整合 PyTorch/TensorFlow，实现容错训练和超参数搜索。 模型部署：Ray Serve 实现在线服务。 一套代码哪里都能跑，只需要加一个 @ray.remote ，本地调试 → 集群运行，无需改代码。 简化任务提交与依赖管理：实现更轻量的开发 问题：传统框架提交任务需手动打包环境、上传依赖，流程复杂。 Ray：支持运行时安装依赖（pip、conda）、支持自定义环境模板（如预装 CUDA、特定库）以及自动并行处理大数据，无需手动拆分（Ray Data）。 云原生友好：弹性伸缩，统一部署体验 问题：云上部署需大量适配代码，资源利用率低。 Ray：支持自动扩缩容，任务高峰自动扩容，空闲时释放资源，节省成本。且支持运行在物理机、K8s、公有云等多种基础设施上。云存储可挂载为本地路径，代码无需修改即可读写（如 AWS S3、OSS）。 高度灵活：构建你想要的分布式系统 问题：Spark、Flink 等框架抽象固定，难以支持高度定制化的 AI 系统。 Ray：提供的是一个通用的分布式计算原语 （Task、Actor、Object Store），可以像“搭积木”一样自由组合，将不同的分布式组件、库和逻辑粘合在一起，构建任意复杂的分布式逻辑。 核心编程模型：Task 与 Actor 这是 Ray 最核心的两个概念\nTask Task 是 Ray 中最小的执行单元，是一个无状态的远程函数调用。 它可以在集群中的任意节点上执行，适合做并行计算、批处理、流水线任务。示例代码：\n加上 @ray.remote，这个函数就变成了可以在集群任意节点运行的 Task @ray.remote def square(x): time.sleep(1) return x * x\n.remote() 是异步调用的，它会立即返回 ObjectRef 此时主程序不阻塞，4 个任务在后台并行跑 futures = [square.remote(i) for i in range(4)]\nray.get() 拿着 ObjectRef 去取结果，如果结果没算好，这里会等待 results = ray.get(futures) 如果我们的任务需要共享状态，例如维护一个全局计数器或加载模型实例，可以使用 Ray 的 Actor 模型。\nActor Actor 是 Ray 中的有状态抽象，是一个远程类实例。 它在集群中运行一个独立进程，可以维护状态，并通过 .remote() 方法调用实现远程方法执行。适用于 模型推理服务（加载模型太慢，不能用完即毁）、全局计数器、训练参数服务器。示例代码： @ray.remote class Counter: def init(self): self.count = 0 # 这里的状态会被保留\ndef increment(self): self.count += 1 return self.count 创建一个 Actor 实例，它在集群某台机器上启动了一个进程 counter = Counter.remote()\n调用方法，状态会累加 f1 = counter.increment.remote() # count = 1 f2 = counter.increment.remote() # count = 2\nprint(ray.get([f1, f2])) Actor 保证了对状态的访问是串行的，不需要手动加锁就能保证线程安全。每个 Actor 都是一个独立的服务，可以在集群的任何地方被调用。 在实际业务中，我们的任务往往对资源有明确的需求，比如：图像处理任务需要 CPU、模型推理任务需要 GPU、某些任务可能需要特定的内存、加速卡、自定义资源（如 TPU、FPGA）等。 Ray 提供了非常灵活的资源调度机制，可以在定义 Task 或 Actor 时，通过参数直接指定所需资源，Ray 会自动调度到具备相应资源的节点上运行。如@ray.remote(num_cpus=2, num_gpus=1)\nRay 的生态与架构 Ray 的架构分为基础设施层 、核心执行层（Ray Core） 和 AI 工作流层（Ray AIR）这三层 ，每层职责分明，协同调度任务。它连接了底层资源与上层 AI 逻辑，让开发者专注于“写什么”，而不是“怎么运行”。 [图片]\n基础设施层 Ray 可部署在物理机、云主机、Docker、Kubernetes 等基础设施之上 Kubernetes 提供节点级调度，Ray 负责应用级调度 Ray 自动管理节点资源，开发者无需关心底层是哪台机器 Ray Core 包含 Ray 的核心组件：GCS、Raylet、Worker、Object Store 提供 Task、Actor、Object Store、Placement Group 等核心 API 是所有上层 AI 应用的基础 Ray AIR 基于 Ray Core 层的机器学习库，这层是做机器学习 Pipeline 面向AI开发者，提供了一整套面向 AI 工作流的工具链 ，统称为 Ray AIR（AI Runtime）： 模块 功能 Ray Data 分布式数据处理，支持多模态数据（文本、图像、视频等） Ray Tune 分布式超参数调优（网格搜索、贝叶斯优化） Ray Train 分布式模型训练，集成 PyTorch、TensorFlow等框架 Ray Serve 模型服务部署，支持高并发、低延迟、版本控制、A/B测试 Ray RLlib 强化学习库，内置主流算法（ PPO、DQN、IMPALA 等） 这些模块共同构成了一个完整的 AI 工作流平台，从数据处理到训练、调优、部署、服务 ，都可在 Ray 上完成。 如何快速上手 Ray 以下是本地单机测试使用 Ray 步骤\n安装 Ray Step 1: 安装 Ray pip install ray 感兴趣的话，可以自行本地编译。 Ray 官方编译指导手册 深入理解其混合架构、掌握模块依赖与构建流程。\n编写并运行第一个 Ray 程序 import ray import time\nStep 2: 初始化并写代码 ray.init()\n@ray.remote def square(x): time.sleep(1) return x * x\n并行执行 Task futures = [square.remote(i) for i in range(4)] results = ray.get(futures)\n执行结果：[0, 1, 4, 9] print(“Task Results:”, results)\nray.shutdown()\n查看 Ray Dashboard 通过 Dashboard，可以实时看到任务的执行情况、资源使用率、日志等。\nStep 3: 查看 Dashboard ray dashboard [图片]\n可观测性与监控 Dashboard：Ray 内置的可视化平台 可查看：集群节点状态、任务执行进度、Actor 运行情况、资源使用统计。 日志聚合：Ray 支持统一的日志收集 通过 ray logs 命令即可查看远程任务或 Actor 的运行日志。 指标与监控：通过 Prometheus + Grafana 可集成 Ray 的运行时指标 如：CPU/GPU 使用率、任务延迟、内存占用、数据传输带宽。 Ray State API：提供命令行和 API 接口 查看：当前运行的作业、Actor 状态、资源池使用情况、Object Store 数据统计。 小米 / 业界应用案例 Ray 已在多个大厂应用，如小米、阿里、字节等，用于大模型训练、推理、多模态数据处理及高并发任务调度等。 Ray 的典型使用场景\n分布式模型训练与调参\n实时推理服务部署\n大数据 ETL 流水线\n分布式缓存、连接池、队列服务\n高并发任务调度（如爬虫、任务队列） case 1 - 在线机器学习中的应用 现在我们通过一个贴近实际业务的案例，来帮助理解 Ray 如何在真实生产环境中提升 AI 工作流的效率与性能。\n背景：一个实时推荐或广告投放场景 ，系统需要根据用户的实时行为（如点击、浏览等）快速做出决策，推送最合适的优惠内容。这种场景对模型的实时性、响应速度和训练效率提出了很高的要求。\n支撑这个业务场景的技术架构，整个流程以 Ray 为核心调度引擎 ：\n从数据流开始，通过 Ray 实现任务调度与资源管理。 Ray 创建并调度多个分布式任务（Tasks）和 Actor，其中一部分 Actor 被用于运行 TF Worker ，直接与共享内存交互，实现高效的特征处理与模型训练。 同时，Ray 还管理了 参数服务器（PS） ，用于同步和更新模型参数，并将训练完成的模型部署到 Serving 节点 ，为前端应用提供实时推理服务。 [图片] 通过案例看出，Ray 不仅是一个底层的分布式调度引擎，更是连接数据、训练、服务与调度的统一平台 ，非常适合需要实时性、高并发和灵活调度 的 AI 场景。可以把复杂的机器学习流程变得更轻、更快、更可控，是 AI 工程化道路上不可多得的利器。 整个架构设计体现了 Ray 的几个关键能力： 任务调度与资源管理 - Ray 能够将数据处理、模型训练、参数同步和模型服务部署统一调度，避免了多个系统割裂的问题；\n共享内存优化 - TF Worker 与共享内存 Object Store 共存，减少了数据复制和传输开销；\n端到端低延迟 - 从数据输入、模型训练到上线部署，整个流程仅需 3~5 分钟，极大提升了模型迭代效率；\n业务指标提升 - 与传统的离线模型相比，CTR 提升了 5%，相较于 Blink 也提升了 1%。 case 2- 大模型数据处理流水线 目前内部 Ray 在大模型数据处理的使用背景： 在小米的大模型训练体系中，数据处理链路是构建高质量训练样本的核心环节，涵盖了从原始数据抽取、清洗过滤、去重打标到最终分桶输出的全过程。由于链路中涉及大量非结构化数据处理、GPU 推理任务调度以及复杂业务规则执行，对系统的灵活性、稳定性和计算效率提出了较高要求。 Ray 凭借其轻量级的分布式抽象、统一的调度机制和良好的扩展性，成为我们数据处理流程中的关键基础设施。与传统以 Spark 为主的批处理架构相比，Ray 更擅长应对那些计算密集、任务粒度细、依赖 GPU 资源 的场景，例如模型打标和文件粒度的并行处理。它允许使用 Python 编程范式进行开发，同时无缝扩展到大规模集群，极大降低了开发与调试成本。 数据抽取（Ray）\n场景：\nHTML 转 Markdown 非结构化数据转结构化数据 优势：\nPython 原生开发，迁移成本低 支持文件粒度处理，便于应对长尾数据 灵活的镜像配置，能够集成多种解析工具链 数据标注（Ray + GPU） 场景：\n模型打分、教师模型打标 优势：\n高效调度GPU推理任务，提升资源利用率 细粒度任务划分，失败重试代价较小 开发调试便捷，支持从单机到集群的平滑过渡 核心价值：Ray 提升了非结构化数据处理的效率，灵活调度 GPU 推理任务，降低开发和调试成本，并增强数据处理链路的可控性。它成为构建统一 AI 工程链路的重要组成部分。 Ray 在小米大模型数据处理中的应用，不仅帮助我们打通了从数据准备、模型处理到训练服务的端到端流程，还构建了一个更加统一、灵活、可控的分布式计算平台。我们希望进一步推动 Ray 在大模型训练、推理和在线服务中的深度整合，打造一个以 Ray 为底座的 AI 工程化体系，为业务迭代与技术创新提供更强有力的支持。 总结 随着分布式计算需求的增长，Ray 将发挥其潜力，推动团队在 AI 和大数据领域的探索与创新。\n",
+  "wordCount" : "667",
+  "inLanguage": "zh-cn",
+  "datePublished": "2026-02-26T17:41:44+08:00",
+  "dateModified": "2026-02-26T17:41:44+08:00",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://Jade07-1.github.io/posts/ray_learn/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Jia Wang",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://Jade07-1.github.io/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+<body id="top">
+    <header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="https://Jade07-1.github.io/" accesskey="h" title="Jia Wang (Alt + H)">Jia Wang</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)" aria-label="Toggle theme">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="https://Jade07-1.github.io/" title="Home">
+                    <span>Home</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://Jade07-1.github.io/posts/" title="Blog">
+                    <span>Blog</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://Jade07-1.github.io/about/" title="About Me">
+                    <span>About Me</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://Jade07-1.github.io/search/" title="Search (Alt &#43; /)" accesskey=/>
+                    <span>Search</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    
+    <h1 class="post-title entry-hint-parent">
+      Ray_learn
+    </h1>
+    <div class="post-meta"><span title='2026-02-26 17:41:44 +0800 CST'>February 26, 2026</span>
+
+</div>
+  </header> <div class="toc">
+    <details >
+        <summary accesskey="c" title="(Alt + C)">
+            <span class="details">Table of Contents</span>
+        </summary>
+
+        <div class="inner"><ul>
+                <li>
+                    <a href="#%e4%b8%ba%e4%bb%80%e4%b9%88%e9%9c%80%e8%a6%81-ray" aria-label="为什么需要 Ray">为什么需要 Ray</a><ul>
+                        
+                <li>
+                    <a href="#%e4%b8%80%e5%8f%a5%e8%af%9d%e5%ae%9a%e4%b9%89-ray" aria-label="一句话定义 Ray">一句话定义 Ray</a></li>
+                <li>
+                    <a href="#ray-%e7%9a%84%e6%a0%b8%e5%bf%83%e8%83%bd%e5%8a%9b" aria-label="Ray 的核心能力">Ray 的核心能力</a></li>
+                <li>
+                    <a href="#ray-%e7%9a%84%e5%ae%9a%e4%bd%8d" aria-label="Ray 的定位">Ray 的定位</a></li>
+                <li>
+                    <a href="#ray-%e7%9a%84%e5%b7%a5%e4%bd%9c%e6%b5%81%e7%a8%8b%e7%ae%80%e8%bf%b0" aria-label="Ray 的工作流程简述">Ray 的工作流程简述</a></li>
+                <li>
+                    <a href="#ray-%e7%9a%84%e6%a0%b8%e5%bf%83%e4%bc%98%e5%8a%bf" aria-label="Ray 的核心优势">Ray 的核心优势</a></li></ul>
+                </li>
+                <li>
+                    <a href="#%e6%a0%b8%e5%bf%83%e7%bc%96%e7%a8%8b%e6%a8%a1%e5%9e%8btask-%e4%b8%8e-actor" aria-label="核心编程模型：Task 与 Actor">核心编程模型：Task 与 Actor</a><ul>
+                        
+                <li>
+                    <a href="#task" aria-label="Task">Task</a></li></ul>
+                </li>
+                <li>
+                    <a href="#%e5%8a%a0%e4%b8%8a-rayremote%e8%bf%99%e4%b8%aa%e5%87%bd%e6%95%b0%e5%b0%b1%e5%8f%98%e6%88%90%e4%ba%86%e5%8f%af%e4%bb%a5%e5%9c%a8%e9%9b%86%e7%be%a4%e4%bb%bb%e6%84%8f%e8%8a%82%e7%82%b9%e8%bf%90%e8%a1%8c%e7%9a%84-task" aria-label="加上 @ray.remote，这个函数就变成了可以在集群任意节点运行的 Task">加上 @ray.remote，这个函数就变成了可以在集群任意节点运行的 Task</a></li>
+                <li>
+                    <a href="#remote-%e6%98%af%e5%bc%82%e6%ad%a5%e8%b0%83%e7%94%a8%e7%9a%84%e5%ae%83%e4%bc%9a%e7%ab%8b%e5%8d%b3%e8%bf%94%e5%9b%9e-objectref" aria-label=".remote() 是异步调用的，它会立即返回 ObjectRef">.remote() 是异步调用的，它会立即返回 ObjectRef</a></li>
+                <li>
+                    <a href="#%e6%ad%a4%e6%97%b6%e4%b8%bb%e7%a8%8b%e5%ba%8f%e4%b8%8d%e9%98%bb%e5%a1%9e4-%e4%b8%aa%e4%bb%bb%e5%8a%a1%e5%9c%a8%e5%90%8e%e5%8f%b0%e5%b9%b6%e8%a1%8c%e8%b7%91" aria-label="此时主程序不阻塞，4 个任务在后台并行跑">此时主程序不阻塞，4 个任务在后台并行跑</a></li>
+                <li>
+                    <a href="#rayget-%e6%8b%bf%e7%9d%80-objectref-%e5%8e%bb%e5%8f%96%e7%bb%93%e6%9e%9c%e5%a6%82%e6%9e%9c%e7%bb%93%e6%9e%9c%e6%b2%a1%e7%ae%97%e5%a5%bd%e8%bf%99%e9%87%8c%e4%bc%9a%e7%ad%89%e5%be%85" aria-label="ray.get() 拿着 ObjectRef 去取结果，如果结果没算好，这里会等待">ray.get() 拿着 ObjectRef 去取结果，如果结果没算好，这里会等待</a><ul>
+                        
+                <li>
+                    <a href="#actor" aria-label="Actor">Actor</a></li></ul>
+                </li>
+                <li>
+                    <a href="#%e5%88%9b%e5%bb%ba%e4%b8%80%e4%b8%aa-actor-%e5%ae%9e%e4%be%8b%e5%ae%83%e5%9c%a8%e9%9b%86%e7%be%a4%e6%9f%90%e5%8f%b0%e6%9c%ba%e5%99%a8%e4%b8%8a%e5%90%af%e5%8a%a8%e4%ba%86%e4%b8%80%e4%b8%aa%e8%bf%9b%e7%a8%8b" aria-label="创建一个 Actor 实例，它在集群某台机器上启动了一个进程">创建一个 Actor 实例，它在集群某台机器上启动了一个进程</a></li>
+                <li>
+                    <a href="#%e8%b0%83%e7%94%a8%e6%96%b9%e6%b3%95%e7%8a%b6%e6%80%81%e4%bc%9a%e7%b4%af%e5%8a%a0" aria-label="调用方法，状态会累加">调用方法，状态会累加</a></li>
+                <li>
+                    <a href="#ray-%e7%9a%84%e7%94%9f%e6%80%81%e4%b8%8e%e6%9e%b6%e6%9e%84" aria-label="Ray 的生态与架构">Ray 的生态与架构</a><ul>
+                        
+                <li>
+                    <a href="#%e5%9f%ba%e7%a1%80%e8%ae%be%e6%96%bd%e5%b1%82" aria-label="基础设施层">基础设施层</a></li>
+                <li>
+                    <a href="#ray-core" aria-label="Ray Core">Ray Core</a></li>
+                <li>
+                    <a href="#ray-air" aria-label="Ray AIR">Ray AIR</a></li></ul>
+                </li>
+                <li>
+                    <a href="#%e5%a6%82%e4%bd%95%e5%bf%ab%e9%80%9f%e4%b8%8a%e6%89%8b-ray" aria-label="如何快速上手 Ray">如何快速上手 Ray</a><ul>
+                        
+                <li>
+                    <a href="#%e5%ae%89%e8%a3%85-ray" aria-label="安装 Ray">安装 Ray</a></li></ul>
+                </li>
+                <li>
+                    <a href="#step-1-%e5%ae%89%e8%a3%85-ray" aria-label="Step 1: 安装 Ray">Step 1: 安装 Ray</a><ul>
+                        
+                <li>
+                    <a href="#%e7%bc%96%e5%86%99%e5%b9%b6%e8%bf%90%e8%a1%8c%e7%ac%ac%e4%b8%80%e4%b8%aa-ray-%e7%a8%8b%e5%ba%8f" aria-label="编写并运行第一个 Ray 程序">编写并运行第一个 Ray 程序</a></li></ul>
+                </li>
+                <li>
+                    <a href="#step-2-%e5%88%9d%e5%a7%8b%e5%8c%96%e5%b9%b6%e5%86%99%e4%bb%a3%e7%a0%81" aria-label="Step 2: 初始化并写代码">Step 2: 初始化并写代码</a></li>
+                <li>
+                    <a href="#%e5%b9%b6%e8%a1%8c%e6%89%a7%e8%a1%8c-task" aria-label="并行执行 Task">并行执行 Task</a></li>
+                <li>
+                    <a href="#%e6%89%a7%e8%a1%8c%e7%bb%93%e6%9e%9c0-1-4-9" aria-label="执行结果：[0, 1, 4, 9]">执行结果：[0, 1, 4, 9]</a><ul>
+                        
+                <li>
+                    <a href="#%e6%9f%a5%e7%9c%8b-ray-dashboard" aria-label="查看 Ray Dashboard">查看 Ray Dashboard</a></li></ul>
+                </li>
+                <li>
+                    <a href="#step-3-%e6%9f%a5%e7%9c%8b-dashboard" aria-label="Step 3: 查看 Dashboard">Step 3: 查看 Dashboard</a><ul>
+                        
+                <li>
+                    <a href="#%e5%8f%af%e8%a7%82%e6%b5%8b%e6%80%a7%e4%b8%8e%e7%9b%91%e6%8e%a7" aria-label="可观测性与监控">可观测性与监控</a></li></ul>
+                </li>
+                <li>
+                    <a href="#%e5%b0%8f%e7%b1%b3--%e4%b8%9a%e7%95%8c%e5%ba%94%e7%94%a8%e6%a1%88%e4%be%8b" aria-label="小米 / 业界应用案例">小米 / 业界应用案例</a></li>
+                <li>
+                    <a href="#%e6%80%bb%e7%bb%93" aria-label="总结">总结</a>
+                </li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+  <div class="post-content"><h1 id="为什么需要-ray">为什么需要 Ray<a hidden class="anchor" aria-hidden="true" href="#为什么需要-ray">#</a></h1>
+<p>在 AI 和大数据任务日益增长的今天，快速构建高性能、易维护、可扩展的分布式系统成为每个工程团队的核心需求。但传统方案往往存在以下痛点：</p>
+<ul>
+<li>需要两套代码（本地开发 + 上线集群）</li>
+<li>依赖消息队列或手动调度</li>
+<li>状态管理复杂，需要自己加锁或用数据库</li>
+<li>资源调度不灵活，难以混部 CPU/GPU 任务</li>
+<li>部署运维复杂，需手动打包、上传、配置
+Ray 的出现，正是为了解决这些问题 。它的核心魔法在于：让分布式编程像写 python 本地程序一样简单。只需要一行装饰器@ray.remote，就能让函数从“单机运行”变成“集群并行”。</li>
+</ul>
+<h2 id="一句话定义-ray">一句话定义 Ray<a hidden class="anchor" aria-hidden="true" href="#一句话定义-ray">#</a></h2>
+<p>Ray 是一个通用的分布式计算框架，支持任务并行、Actor 模型、资源调度、共享内存及容错等核心能力，让开发者便捷的构建复杂的分布式应用。
+<img alt="alt text" loading="lazy" src="image.png"></p>
+<h2 id="ray-的核心能力">Ray 的核心能力<a hidden class="anchor" aria-hidden="true" href="#ray-的核心能力">#</a></h2>
+<ul>
+<li>任务并行 ：自动将函数调用分布到多个节点上执行，以高效利用资源。</li>
+<li>Actor 模型 ：支持构建有状态服务，如缓存和模型服务，简化状态管理。</li>
+<li>资源调度 ：灵活指定 CPU、GPU、内存等资源需求，实现精细化控制。</li>
+<li>容错机制 ：自动重试失败的任务，维护系统稳定性。</li>
+<li>Python-first API ：友好的 Python 接口，同时支持 Java 和 C++。</li>
+<li>高性能数据传输：支持共享内存和跨节点数据传输，提升数据处理效率。</li>
+<li>云原生集成 ：兼容 Kubernetes、Docker、云存储。
+Ray 的设计理念：
+让开发者专注逻辑和资源需求，而将调度、容错、传输、内存管理等决定性因素交由 Ray 自动处理。</li>
+</ul>
+<h2 id="ray-的定位">Ray 的定位<a hidden class="anchor" aria-hidden="true" href="#ray-的定位">#</a></h2>
+<p>对比对象
+Ray 的优势
+Celery</p>
+<ul>
+<li>Ray 作为分布式计算引擎，不依赖消息队列，内置调度机制，灵活构建复杂的服务；</li>
+<li>Celery 是任务队列，需要依赖消息队列（如 Redis、RabbitMQ）
+Spark</li>
+<li>Ray 延迟更低、支持有状态、适合 AI 场景、实时计算；</li>
+<li>Spark 是大数据批处理引擎，更适合批处理、ETL等离线大作业
+Kubernetes Job</li>
+<li>Ray 是应用内的调度器，支持细粒度资源控制（如 0.5 个 CPU）、Actor 服务、多任务协同；</li>
+<li>K8s 是基础设施调度，无法精细控制任务级资源，无法支持 Actor，适合短期的批处理任务
+因此，Ray 不是 Spark、Kubernetes Job 的替代品，而是填补它们之间的空白 。
+它更像是一个应用级的调度引擎 ，能解决 AI 工作流中遇到的“最后一公里”问题 —— 比如 ETL 后的数据如何高效调度到训练节点，如何在 GPU 上并行处理多模态数据，如何构建低延迟、高并发的推理服务等。</li>
+</ul>
+<h2 id="ray-的工作流程简述">Ray 的工作流程简述<a hidden class="anchor" aria-hidden="true" href="#ray-的工作流程简述">#</a></h2>
+<ol>
+<li>定义一个函数或类，加上 @ray.remote 装饰器。</li>
+<li>调用 .remote() 方法提交任务到集群。</li>
+<li>GCS（全局控制服务）调度任务到合适的节点。</li>
+<li>Raylet（本地调度器）在节点上调度任务或 Actor。</li>
+<li>执行完后，结果存储在 Object Store 中，返回 ObjectRef。</li>
+<li>其他任务或 Actor 可以通过 ray.get() 或 ray.wait() 获取结果。
+Ray 的核心架构：一个头节点负责调度，多个工作节点负责执行 Task 和 Actor。</li>
+</ol>
+<ul>
+<li>GCS：负责全局调度、元数据管理、Actor 生命周期管理</li>
+<li>Raylet ：节点本地调度器，负责任务分发、资源管理</li>
+<li>Object Store ：分布式共享内存，用于 Task/Actor 之间高效数据传输
+[图片]</li>
+</ul>
+<h2 id="ray-的核心优势">Ray 的核心优势<a hidden class="anchor" aria-hidden="true" href="#ray-的核心优势">#</a></h2>
+<p>Ray 的诞生背景：为了解决 AI 和大规模数据处理场景下，传统框架（如 Spark、Celery）在任务调度、状态维护、资源利用等方面存在多个痛点。
+Ray 的设计初衷：为新兴 AI 应用（如深度学习、强化学习和超参数调优）提供一个高性能、易用且灵活的底层框架，从而提升开发和计算效率。</p>
+<ol>
+<li>异构资源调度：灵活支持 CPU/GPU 混部</li>
+</ol>
+<ul>
+<li>问题：复杂 AI Pipeline 不同阶段资源需求差异大（如预处理用 CPU、训练用 GPU），传统框架调度不灵活。</li>
+<li>Ray ：允许用户在 Task 和 Actor 上直接指定资源需求（如 @ray.remote(num_gpus=1)）。调度器能精确分配任务到相应资源的节点上，实现高效混部。</li>
+</ul>
+<ol start="2">
+<li>细粒度任务调度：微秒级响应，支持高频计算</li>
+</ol>
+<ul>
+<li>问题：如 Spark 等框架调度延迟高，难以应对强化学习、超参搜索等场景中数百万微小任务的调度需求。</li>
+<li>Ray：支持微秒级的任务调度，每秒可调度数百万个任务，资源利用率高，适合细粒度、高并发的 AI 场景。</li>
+</ul>
+<ol start="3">
+<li>原生支持有状态计算：Actor 模型</li>
+</ol>
+<ul>
+<li>问题：Spark 等框架侧重无状态任务，状态维护需依赖外部系统（如 Redis），开发复杂、性能受限。</li>
+<li>Ray：引入了 Actor 模型，允许开发者像编写普通 Python 类一样创建有状态服务。Ray 负责管理 Actor 的生命期，使得实现参数服务器和模拟环境变得简单高效。</li>
+</ul>
+<ol start="4">
+<li>统一编程模型：覆盖 AI 全流程，一套代码跑 everywhere</li>
+</ol>
+<ul>
+<li>问题：构建完整 AI 系统通常需要多个工具，增加了架构复杂性及维护成本。且需编写两套代码，一套用于本地，另一套用于服务器，重复开发增加调试压力。</li>
+<li>Ray：提供统一编程模型，通过 Task 和 Actor 实现数据处理、模型训练和部署，简化架构：
+<ol>
+<li>数据处理：通过 Ray Core 和 Ray Data 处理多模态数据和分布式 ETL。</li>
+<li>训练与调参：Ray Train 和 Ray Tune 整合 PyTorch/TensorFlow，实现容错训练和超参数搜索。</li>
+<li>模型部署：Ray Serve 实现在线服务。
+一套代码哪里都能跑，只需要加一个 @ray.remote ，本地调试 → 集群运行，无需改代码。</li>
+</ol>
+</li>
+</ul>
+<ol start="5">
+<li>简化任务提交与依赖管理：实现更轻量的开发</li>
+</ol>
+<ul>
+<li>问题：传统框架提交任务需手动打包环境、上传依赖，流程复杂。</li>
+<li>Ray：支持运行时安装依赖（pip、conda）、支持自定义环境模板（如预装 CUDA、特定库）以及自动并行处理大数据，无需手动拆分（Ray Data）。</li>
+</ul>
+<ol start="6">
+<li>云原生友好：弹性伸缩，统一部署体验</li>
+</ol>
+<ul>
+<li>问题：云上部署需大量适配代码，资源利用率低。</li>
+<li>Ray：支持自动扩缩容，任务高峰自动扩容，空闲时释放资源，节省成本。且支持运行在物理机、K8s、公有云等多种基础设施上。云存储可挂载为本地路径，代码无需修改即可读写（如 AWS S3、OSS）。</li>
+</ul>
+<ol start="7">
+<li>高度灵活：构建你想要的分布式系统</li>
+</ol>
+<ul>
+<li>问题：Spark、Flink 等框架抽象固定，难以支持高度定制化的 AI 系统。</li>
+<li>Ray：提供的是一个通用的分布式计算原语 （Task、Actor、Object Store），可以像“搭积木”一样自由组合，将不同的分布式组件、库和逻辑粘合在一起，构建任意复杂的分布式逻辑。</li>
+</ul>
+<h1 id="核心编程模型task-与-actor">核心编程模型：Task 与 Actor<a hidden class="anchor" aria-hidden="true" href="#核心编程模型task-与-actor">#</a></h1>
+<p>这是 Ray 最核心的两个概念</p>
+<h2 id="task">Task<a hidden class="anchor" aria-hidden="true" href="#task">#</a></h2>
+<p>Task 是 Ray 中最小的执行单元，是一个无状态的远程函数调用。
+它可以在集群中的任意节点上执行，适合做并行计算、批处理、流水线任务。示例代码：</p>
+<h1 id="加上-rayremote这个函数就变成了可以在集群任意节点运行的-task">加上 @ray.remote，这个函数就变成了可以在集群任意节点运行的 Task<a hidden class="anchor" aria-hidden="true" href="#加上-rayremote这个函数就变成了可以在集群任意节点运行的-task">#</a></h1>
+<p>@ray.remote
+def square(x):
+time.sleep(1)
+return x * x</p>
+<h1 id="remote-是异步调用的它会立即返回-objectref">.remote() 是异步调用的，它会立即返回 ObjectRef<a hidden class="anchor" aria-hidden="true" href="#remote-是异步调用的它会立即返回-objectref">#</a></h1>
+<h1 id="此时主程序不阻塞4-个任务在后台并行跑">此时主程序不阻塞，4 个任务在后台并行跑<a hidden class="anchor" aria-hidden="true" href="#此时主程序不阻塞4-个任务在后台并行跑">#</a></h1>
+<p>futures = [square.remote(i) for i in range(4)]</p>
+<h1 id="rayget-拿着-objectref-去取结果如果结果没算好这里会等待">ray.get() 拿着 ObjectRef 去取结果，如果结果没算好，这里会等待<a hidden class="anchor" aria-hidden="true" href="#rayget-拿着-objectref-去取结果如果结果没算好这里会等待">#</a></h1>
+<p>results = ray.get(futures)
+如果我们的任务需要共享状态，例如维护一个全局计数器或加载模型实例，可以使用 Ray 的 Actor 模型。</p>
+<h2 id="actor">Actor<a hidden class="anchor" aria-hidden="true" href="#actor">#</a></h2>
+<p>Actor 是 Ray 中的有状态抽象，是一个远程类实例。
+它在集群中运行一个独立进程，可以维护状态，并通过 .remote() 方法调用实现远程方法执行。适用于 模型推理服务（加载模型太慢，不能用完即毁）、全局计数器、训练参数服务器。示例代码：
+@ray.remote
+class Counter:
+def <strong>init</strong>(self):
+self.count = 0 # 这里的状态会被保留</p>
+<pre><code>def increment(self):
+    self.count += 1
+    return self.count
+</code></pre>
+<h1 id="创建一个-actor-实例它在集群某台机器上启动了一个进程">创建一个 Actor 实例，它在集群某台机器上启动了一个进程<a hidden class="anchor" aria-hidden="true" href="#创建一个-actor-实例它在集群某台机器上启动了一个进程">#</a></h1>
+<p>counter = Counter.remote()</p>
+<h1 id="调用方法状态会累加">调用方法，状态会累加<a hidden class="anchor" aria-hidden="true" href="#调用方法状态会累加">#</a></h1>
+<p>f1 = counter.increment.remote() # count = 1
+f2 = counter.increment.remote() # count = 2</p>
+<p>print(ray.get([f1, f2]))
+Actor 保证了对状态的访问是串行的，不需要手动加锁就能保证线程安全。每个 Actor 都是一个独立的服务，可以在集群的任何地方被调用。
+在实际业务中，我们的任务往往对资源有明确的需求，比如：图像处理任务需要 CPU、模型推理任务需要 GPU、某些任务可能需要特定的内存、加速卡、自定义资源（如 TPU、FPGA）等。
+Ray 提供了非常灵活的资源调度机制，可以在定义 Task 或 Actor 时，通过参数直接指定所需资源，Ray 会自动调度到具备相应资源的节点上运行。如@ray.remote(num_cpus=2, num_gpus=1)</p>
+<h1 id="ray-的生态与架构">Ray 的生态与架构<a hidden class="anchor" aria-hidden="true" href="#ray-的生态与架构">#</a></h1>
+<p>Ray 的架构分为基础设施层 、核心执行层（Ray Core） 和 AI 工作流层（Ray AIR）这三层 ，每层职责分明，协同调度任务。它连接了底层资源与上层 AI 逻辑，让开发者专注于“写什么”，而不是“怎么运行”。
+[图片]</p>
+<h2 id="基础设施层">基础设施层<a hidden class="anchor" aria-hidden="true" href="#基础设施层">#</a></h2>
+<ul>
+<li>Ray 可部署在物理机、云主机、Docker、Kubernetes 等基础设施之上</li>
+<li>Kubernetes 提供节点级调度，Ray 负责应用级调度</li>
+<li>Ray 自动管理节点资源，开发者无需关心底层是哪台机器</li>
+</ul>
+<h2 id="ray-core">Ray Core<a hidden class="anchor" aria-hidden="true" href="#ray-core">#</a></h2>
+<ul>
+<li>包含 Ray 的核心组件：GCS、Raylet、Worker、Object Store</li>
+<li>提供 Task、Actor、Object Store、Placement Group 等核心 API</li>
+<li>是所有上层 AI 应用的基础</li>
+</ul>
+<h2 id="ray-air">Ray AIR<a hidden class="anchor" aria-hidden="true" href="#ray-air">#</a></h2>
+<ul>
+<li>基于 Ray Core 层的机器学习库，这层是做机器学习 Pipeline</li>
+<li>面向AI开发者，提供了一整套面向 AI 工作流的工具链 ，统称为 Ray AIR（AI Runtime）：
+模块
+功能
+Ray Data
+分布式数据处理，支持多模态数据（文本、图像、视频等）
+Ray Tune
+分布式超参数调优（网格搜索、贝叶斯优化）
+Ray Train
+分布式模型训练，集成 PyTorch、TensorFlow等框架
+Ray Serve
+模型服务部署，支持高并发、低延迟、版本控制、A/B测试
+Ray RLlib
+强化学习库，内置主流算法（ PPO、DQN、IMPALA 等）
+这些模块共同构成了一个完整的 AI 工作流平台，从数据处理到训练、调优、部署、服务 ，都可在 Ray 上完成。</li>
+</ul>
+<h1 id="如何快速上手-ray">如何快速上手 Ray<a hidden class="anchor" aria-hidden="true" href="#如何快速上手-ray">#</a></h1>
+<p>以下是本地单机测试使用 Ray 步骤</p>
+<h2 id="安装-ray">安装 Ray<a hidden class="anchor" aria-hidden="true" href="#安装-ray">#</a></h2>
+<h1 id="step-1-安装-ray">Step 1: 安装 Ray<a hidden class="anchor" aria-hidden="true" href="#step-1-安装-ray">#</a></h1>
+<p>pip install ray
+感兴趣的话，可以自行本地编译。 Ray 官方编译指导手册 深入理解其混合架构、掌握模块依赖与构建流程。</p>
+<h2 id="编写并运行第一个-ray-程序">编写并运行第一个 Ray 程序<a hidden class="anchor" aria-hidden="true" href="#编写并运行第一个-ray-程序">#</a></h2>
+<p>import ray
+import time</p>
+<h1 id="step-2-初始化并写代码">Step 2: 初始化并写代码<a hidden class="anchor" aria-hidden="true" href="#step-2-初始化并写代码">#</a></h1>
+<p>ray.init()</p>
+<p>@ray.remote
+def square(x):
+time.sleep(1)
+return x * x</p>
+<h1 id="并行执行-task">并行执行 Task<a hidden class="anchor" aria-hidden="true" href="#并行执行-task">#</a></h1>
+<p>futures = [square.remote(i) for i in range(4)]
+results = ray.get(futures)</p>
+<h1 id="执行结果0-1-4-9">执行结果：[0, 1, 4, 9]<a hidden class="anchor" aria-hidden="true" href="#执行结果0-1-4-9">#</a></h1>
+<p>print(&ldquo;Task Results:&rdquo;, results)</p>
+<p>ray.shutdown()</p>
+<h2 id="查看-ray-dashboard">查看 Ray Dashboard<a hidden class="anchor" aria-hidden="true" href="#查看-ray-dashboard">#</a></h2>
+<p>通过 Dashboard，可以实时看到任务的执行情况、资源使用率、日志等。</p>
+<h1 id="step-3-查看-dashboard">Step 3: 查看 Dashboard<a hidden class="anchor" aria-hidden="true" href="#step-3-查看-dashboard">#</a></h1>
+<p>ray dashboard
+[图片]</p>
+<h2 id="可观测性与监控">可观测性与监控<a hidden class="anchor" aria-hidden="true" href="#可观测性与监控">#</a></h2>
+<ul>
+<li>Dashboard：Ray 内置的可视化平台
+<ul>
+<li>可查看：集群节点状态、任务执行进度、Actor 运行情况、资源使用统计。</li>
+</ul>
+</li>
+<li>日志聚合：Ray 支持统一的日志收集
+<ul>
+<li>通过 ray logs 命令即可查看远程任务或 Actor 的运行日志。</li>
+</ul>
+</li>
+<li>指标与监控：通过 Prometheus + Grafana 可集成 Ray 的运行时指标
+<ul>
+<li>如：CPU/GPU 使用率、任务延迟、内存占用、数据传输带宽。</li>
+</ul>
+</li>
+<li>Ray State API：提供命令行和 API 接口
+<ul>
+<li>查看：当前运行的作业、Actor 状态、资源池使用情况、Object Store 数据统计。</li>
+</ul>
+</li>
+</ul>
+<h1 id="小米--业界应用案例">小米 / 业界应用案例<a hidden class="anchor" aria-hidden="true" href="#小米--业界应用案例">#</a></h1>
+<p>Ray 已在多个大厂应用，如小米、阿里、字节等，用于大模型训练、推理、多模态数据处理及高并发任务调度等。
+Ray 的典型使用场景</p>
+<ul>
+<li>
+<p>分布式模型训练与调参</p>
+</li>
+<li>
+<p>实时推理服务部署</p>
+</li>
+<li>
+<p>大数据 ETL 流水线</p>
+</li>
+<li>
+<p>分布式缓存、连接池、队列服务</p>
+</li>
+<li>
+<p>高并发任务调度（如爬虫、任务队列）
+case 1 - 在线机器学习中的应用
+现在我们通过一个贴近实际业务的案例，来帮助理解 Ray 如何在真实生产环境中提升 AI 工作流的效率与性能。</p>
+</li>
+<li>
+<p>背景：一个实时推荐或广告投放场景 ，系统需要根据用户的实时行为（如点击、浏览等）快速做出决策，推送最合适的优惠内容。这种场景对模型的实时性、响应速度和训练效率提出了很高的要求。</p>
+</li>
+<li>
+<p>支撑这个业务场景的技术架构，整个流程以 Ray 为核心调度引擎 ：</p>
+<ul>
+<li>从数据流开始，通过 Ray 实现任务调度与资源管理。</li>
+<li>Ray 创建并调度多个分布式任务（Tasks）和 Actor，其中一部分 Actor 被用于运行 TF Worker ，直接与共享内存交互，实现高效的特征处理与模型训练。</li>
+<li>同时，Ray 还管理了 参数服务器（PS） ，用于同步和更新模型参数，并将训练完成的模型部署到 Serving 节点 ，为前端应用提供实时推理服务。
+[图片]
+通过案例看出，Ray 不仅是一个底层的分布式调度引擎，更是连接数据、训练、服务与调度的统一平台 ，非常适合需要实时性、高并发和灵活调度 的 AI 场景。可以把复杂的机器学习流程变得更轻、更快、更可控，是 AI 工程化道路上不可多得的利器。
+整个架构设计体现了 Ray 的几个关键能力：</li>
+</ul>
+</li>
+<li>
+<p>任务调度与资源管理 - Ray 能够将数据处理、模型训练、参数同步和模型服务部署统一调度，避免了多个系统割裂的问题；</p>
+</li>
+<li>
+<p>共享内存优化 - TF Worker 与共享内存 Object Store 共存，减少了数据复制和传输开销；</p>
+</li>
+<li>
+<p>端到端低延迟 - 从数据输入、模型训练到上线部署，整个流程仅需 3~5 分钟，极大提升了模型迭代效率；</p>
+</li>
+<li>
+<p>业务指标提升 - 与传统的离线模型相比，CTR 提升了 5%，相较于 Blink 也提升了 1%。
+case 2- 大模型数据处理流水线
+目前内部 Ray 在大模型数据处理的使用背景：
+在小米的大模型训练体系中，数据处理链路是构建高质量训练样本的核心环节，涵盖了从原始数据抽取、清洗过滤、去重打标到最终分桶输出的全过程。由于链路中涉及大量非结构化数据处理、GPU 推理任务调度以及复杂业务规则执行，对系统的灵活性、稳定性和计算效率提出了较高要求。
+Ray 凭借其轻量级的分布式抽象、统一的调度机制和良好的扩展性，成为我们数据处理流程中的关键基础设施。与传统以 Spark 为主的批处理架构相比，Ray 更擅长应对那些计算密集、任务粒度细、依赖 GPU 资源 的场景，例如模型打标和文件粒度的并行处理。它允许使用 Python 编程范式进行开发，同时无缝扩展到大规模集群，极大降低了开发与调试成本。
+数据抽取（Ray）</p>
+</li>
+<li>
+<p>场景：</p>
+<ul>
+<li>HTML 转 Markdown</li>
+<li>非结构化数据转结构化数据</li>
+</ul>
+</li>
+<li>
+<p>优势：</p>
+<ul>
+<li>Python 原生开发，迁移成本低</li>
+<li>支持文件粒度处理，便于应对长尾数据</li>
+<li>灵活的镜像配置，能够集成多种解析工具链
+数据标注（Ray + GPU）</li>
+</ul>
+</li>
+<li>
+<p>场景：</p>
+<ul>
+<li>模型打分、教师模型打标</li>
+</ul>
+</li>
+<li>
+<p>优势：</p>
+<ul>
+<li>高效调度GPU推理任务，提升资源利用率</li>
+<li>细粒度任务划分，失败重试代价较小</li>
+<li>开发调试便捷，支持从单机到集群的平滑过渡
+核心价值：Ray 提升了非结构化数据处理的效率，灵活调度 GPU 推理任务，降低开发和调试成本，并增强数据处理链路的可控性。它成为构建统一 AI 工程链路的重要组成部分。
+Ray 在小米大模型数据处理中的应用，不仅帮助我们打通了从数据准备、模型处理到训练服务的端到端流程，还构建了一个更加统一、灵活、可控的分布式计算平台。我们希望进一步推动 Ray 在大模型训练、推理和在线服务中的深度整合，打造一个以 Ray 为底座的 AI 工程化体系，为业务迭代与技术创新提供更强有力的支持。</li>
+</ul>
+</li>
+</ul>
+<h1 id="总结">总结<a hidden class="anchor" aria-hidden="true" href="#总结">#</a></h1>
+<p>随着分布式计算需求的增长，Ray 将发挥其潜力，推动团队在 AI 和大数据领域的探索与创新。</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+    </ul>
+<nav class="paginav">
+  <a class="next" href="https://Jade07-1.github.io/posts/my-first-blog/">
+    <span class="title"> »</span>
+    <br>
+    <span>My First Blog</span>
+  </a>
+</nav>
+
+
+<ul class="share-buttons">
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share Ray_learn on x"
+            href="https://x.com/intent/tweet/?text=Ray_learn&amp;url=https%3a%2f%2fJade07-1.github.io%2fposts%2fray_learn%2f&amp;hashtags=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M512 62.554 L 512 449.446 C 512 483.97 483.97 512 449.446 512 L 62.554 512 C 28.03 512 0 483.97 0 449.446 L 0 62.554 C 0 28.03 28.029 0 62.554 0 L 449.446 0 C 483.971 0 512 28.03 512 62.554 Z M 269.951 190.75 L 182.567 75.216 L 56 75.216 L 207.216 272.95 L 63.9 436.783 L 125.266 436.783 L 235.9 310.383 L 332.567 436.783 L 456 436.783 L 298.367 228.367 L 432.367 75.216 L 371.033 75.216 Z M 127.633 110 L 164.101 110 L 383.481 400.065 L 349.5 400.065 Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share Ray_learn on linkedin"
+            href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fJade07-1.github.io%2fposts%2fray_learn%2f&amp;title=Ray_learn&amp;summary=Ray_learn&amp;source=https%3a%2f%2fJade07-1.github.io%2fposts%2fray_learn%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-288.985,423.278l0,-225.717l-75.04,0l0,225.717l75.04,0Zm270.539,0l0,-129.439c0,-69.333 -37.018,-101.586 -86.381,-101.586c-39.804,0 -57.634,21.891 -67.617,37.266l0,-31.958l-75.021,0c0.995,21.181 0,225.717 0,225.717l75.02,0l0,-126.056c0,-6.748 0.486,-13.492 2.474,-18.315c5.414,-13.475 17.767,-27.434 38.494,-27.434c27.135,0 38.007,20.707 38.007,51.037l0,120.768l75.024,0Zm-307.552,-334.556c-25.674,0 -42.448,16.879 -42.448,39.002c0,21.658 16.264,39.002 41.455,39.002l0.484,0c26.165,0 42.452,-17.344 42.452,-39.002c-0.485,-22.092 -16.241,-38.954 -41.943,-39.002Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share Ray_learn on reddit"
+            href="https://reddit.com/submit?url=https%3a%2f%2fJade07-1.github.io%2fposts%2fray_learn%2f&title=Ray_learn">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-3.446,265.638c0,-22.964 -18.616,-41.58 -41.58,-41.58c-11.211,0 -21.361,4.457 -28.841,11.666c-28.424,-20.508 -67.586,-33.757 -111.204,-35.278l18.941,-89.121l61.884,13.157c0.756,15.734 13.642,28.29 29.56,28.29c16.407,0 29.706,-13.299 29.706,-29.701c0,-16.403 -13.299,-29.702 -29.706,-29.702c-11.666,0 -21.657,6.792 -26.515,16.578l-69.105,-14.69c-1.922,-0.418 -3.939,-0.042 -5.585,1.036c-1.658,1.073 -2.811,2.761 -3.224,4.686l-21.152,99.438c-44.258,1.228 -84.046,14.494 -112.837,35.232c-7.468,-7.164 -17.589,-11.591 -28.757,-11.591c-22.965,0 -41.585,18.616 -41.585,41.58c0,16.896 10.095,31.41 24.568,37.918c-0.639,4.135 -0.99,8.328 -0.99,12.576c0,63.977 74.469,115.836 166.33,115.836c91.861,0 166.334,-51.859 166.334,-115.836c0,-4.218 -0.347,-8.387 -0.977,-12.493c14.564,-6.47 24.735,-21.034 24.735,-38.001Zm-119.474,108.193c-20.27,20.241 -59.115,21.816 -70.534,21.816c-11.428,0 -50.277,-1.575 -70.522,-21.82c-3.007,-3.008 -3.007,-7.882 0,-10.889c3.003,-2.999 7.882,-3.003 10.885,0c12.777,12.781 40.11,17.317 59.637,17.317c19.522,0 46.86,-4.536 59.657,-17.321c3.016,-2.999 7.886,-2.995 10.885,0.008c3.008,3.011 3.003,7.882 -0.008,10.889Zm-5.23,-48.781c-16.373,0 -29.701,-13.324 -29.701,-29.698c0,-16.381 13.328,-29.714 29.701,-29.714c16.378,0 29.706,13.333 29.706,29.714c0,16.374 -13.328,29.698 -29.706,29.698Zm-160.386,-29.702c0,-16.381 13.328,-29.71 29.714,-29.71c16.369,0 29.689,13.329 29.689,29.71c0,16.373 -13.32,29.693 -29.689,29.693c-16.386,0 -29.714,-13.32 -29.714,-29.693Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share Ray_learn on facebook"
+            href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fJade07-1.github.io%2fposts%2fray_learn%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-106.468,0l0,-192.915l66.6,0l12.672,-82.621l-79.272,0l0,-53.617c0,-22.603 11.073,-44.636 46.58,-44.636l36.042,0l0,-70.34c0,0 -32.71,-5.582 -63.982,-5.582c-65.288,0 -107.96,39.569 -107.96,111.204l0,62.971l-72.573,0l0,82.621l72.573,0l0,192.915l-191.104,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share Ray_learn on whatsapp"
+            href="https://api.whatsapp.com/send?text=Ray_learn%20-%20https%3a%2f%2fJade07-1.github.io%2fposts%2fray_learn%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-58.673,127.703c-33.842,-33.881 -78.847,-52.548 -126.798,-52.568c-98.799,0 -179.21,80.405 -179.249,179.234c-0.013,31.593 8.241,62.428 23.927,89.612l-25.429,92.884l95.021,-24.925c26.181,14.28 55.659,21.807 85.658,21.816l0.074,0c98.789,0 179.206,-80.413 179.247,-179.243c0.018,-47.895 -18.61,-92.93 -52.451,-126.81Zm-126.797,275.782l-0.06,0c-26.734,-0.01 -52.954,-7.193 -75.828,-20.767l-5.441,-3.229l-56.386,14.792l15.05,-54.977l-3.542,-5.637c-14.913,-23.72 -22.791,-51.136 -22.779,-79.287c0.033,-82.142 66.867,-148.971 149.046,-148.971c39.793,0.014 77.199,15.531 105.329,43.692c28.128,28.16 43.609,65.592 43.594,105.4c-0.034,82.149 -66.866,148.983 -148.983,148.984Zm81.721,-111.581c-4.479,-2.242 -26.499,-13.075 -30.604,-14.571c-4.105,-1.495 -7.091,-2.241 -10.077,2.241c-2.986,4.483 -11.569,14.572 -14.182,17.562c-2.612,2.988 -5.225,3.364 -9.703,1.12c-4.479,-2.241 -18.91,-6.97 -36.017,-22.23c-13.314,-11.876 -22.304,-26.542 -24.916,-31.026c-2.612,-4.484 -0.279,-6.908 1.963,-9.14c2.016,-2.007 4.48,-5.232 6.719,-7.847c2.24,-2.615 2.986,-4.484 4.479,-7.472c1.493,-2.99 0.747,-5.604 -0.374,-7.846c-1.119,-2.241 -10.077,-24.288 -13.809,-33.256c-3.635,-8.733 -7.327,-7.55 -10.077,-7.688c-2.609,-0.13 -5.598,-0.158 -8.583,-0.158c-2.986,0 -7.839,1.121 -11.944,5.604c-4.105,4.484 -15.675,15.32 -15.675,37.364c0,22.046 16.048,43.342 18.287,46.332c2.24,2.99 31.582,48.227 76.511,67.627c10.685,4.615 19.028,7.371 25.533,9.434c10.728,3.41 20.492,2.929 28.209,1.775c8.605,-1.285 26.499,-10.833 30.231,-21.295c3.732,-10.464 3.732,-19.431 2.612,-21.298c-1.119,-1.869 -4.105,-2.99 -8.583,-5.232Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share Ray_learn on telegram"
+            href="https://telegram.me/share/url?text=Ray_learn&amp;url=https%3a%2f%2fJade07-1.github.io%2fposts%2fray_learn%2f">
+            <svg version="1.1" xml:space="preserve" viewBox="2 2 28 28" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M26.49,29.86H5.5a3.37,3.37,0,0,1-2.47-1,3.35,3.35,0,0,1-1-2.47V5.48A3.36,3.36,0,0,1,3,3,3.37,3.37,0,0,1,5.5,2h21A3.38,3.38,0,0,1,29,3a3.36,3.36,0,0,1,1,2.46V26.37a3.35,3.35,0,0,1-1,2.47A3.38,3.38,0,0,1,26.49,29.86Zm-5.38-6.71a.79.79,0,0,0,.85-.66L24.73,9.24a.55.55,0,0,0-.18-.46.62.62,0,0,0-.41-.17q-.08,0-16.53,6.11a.59.59,0,0,0-.41.59.57.57,0,0,0,.43.52l4,1.24,1.61,4.83a.62.62,0,0,0,.63.43.56.56,0,0,0,.4-.17L16.54,20l4.09,3A.9.9,0,0,0,21.11,23.15ZM13.8,20.71l-1.21-4q8.72-5.55,8.78-5.55c.15,0,.23,0,.23.16a.18.18,0,0,1,0,.06s-2.51,2.3-7.52,6.8Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share Ray_learn on ycombinator"
+            href="https://news.ycombinator.com/submitlink?t=Ray_learn&u=https%3a%2f%2fJade07-1.github.io%2fposts%2fray_learn%2f">
+            <svg version="1.1" xml:space="preserve" width="30px" height="30px" viewBox="0 0 512 512" fill="currentColor"
+                xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+                <path
+                    d="M449.446 0C483.971 0 512 28.03 512 62.554L512 449.446C512 483.97 483.97 512 449.446 512L62.554 512C28.03 512 0 483.97 0 449.446L0 62.554C0 28.03 28.029 0 62.554 0L449.446 0ZM183.8767 87.9921H121.8427L230.6673 292.4508V424.0079H281.3328V292.4508L390.1575 87.9921H328.1233L256 238.2489z" />
+            </svg>
+        </a>
+    </li>
+</ul>
+
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2026 <a href="https://Jade07-1.github.io/">Jia Wang</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu');
+    if (menu) {
+        
+        const scrollPosition = localStorage.getItem("menu-scroll-position");
+        if (scrollPosition) {
+            menu.scrollLeft = parseInt(scrollPosition, 10);
+        }
+        
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        const html = document.querySelector("html");
+        if (html.dataset.theme === "dark") {
+            html.dataset.theme = 'light';
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            html.dataset.theme = 'dark';
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+</body>
+
+</html>
